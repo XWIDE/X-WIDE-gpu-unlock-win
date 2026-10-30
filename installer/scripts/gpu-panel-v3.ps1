@@ -149,7 +149,7 @@ $script:helpSections = @(
     @{ h = '怎么确认真的解锁了'; b = "点「测一下当前算力」：BF16 约 116 TFLOP 以上＝已解锁；约 56 TFLOP＝未解锁。也可以看顶部大字：绿色「已解锁」就是生效了。" },
     @{ h = '想关掉（恢复原样）'; b = "点「恢复原样（关掉自动挡）」：会启用显卡并停用三个计划任务（不删除），解锁值在下次重启、断电后自然失效。想再开回来，点「一键解锁」重新走一次即可。" },
     @{ h = '开源徽标 · 许可证'; b = "本项目是 Zagitta/gpu-unlock（Linux 内核模块，GPL-2.0）的 Windows 移植 + 开机调度层。`r`n许可证：GPL-2.0。固件资产由 NVIDIA 开源内核模块源码现场抽取，不随包分发。" },
-    @{ h = '作者 / 反馈'; b = "作者：X-WIDE · B 站 374064919 · xiupk@sina.com.cn`r`n出问题把日志发作者：C:\ProgramData\GpuUnlock\boot-unlock-*.log（开机解锁）与 disable-at-shutdown.log（关机禁用）。" },
+    @{ h = '作者 / 反馈'; b = "作者：X-WIDE（B 站、GitHub、邮箱见本页最下方「出处与致谢」，可直接点开）`r`n出问题把日志发作者：C:\ProgramData\GpuUnlock\boot-unlock-*.log（开机解锁）与 disable-at-shutdown.log（关机禁用）。" },
     @{ h = '已知限制'; b = "只在 GA102（3090 Ti / 3090 / 3080 Ti / 3080 / A6000）真机验证过；40 系上游标记实验性，50 系不支持。开机后约 30-60 秒显示是基础分辨率，恢复后正常。测试模式水印无法去除（关掉测试签名会让驱动加载不了）。" }
 )
 $script:helpTitle = 'GPU-UNLOCK · 使用说明与开源信息'
@@ -159,11 +159,17 @@ $script:creditLines = @(
     '本包：GPU-UNLOCK · Windows 开机自动挡 v3.1 · 2026-10-31 · 许可证 GPL-2.0',
     '最源头：Zagitta/gpu-unlock（Linux 内核模块，整套解锁技术的原始出处，GPL-2.0）',
     'Windows 分支版：windows-GPU-UNLOCK（EFI 预启动解锁路线，与本包同一技术脉络）',
-    '作者：X-WIDE · B 站 374064919 · xiupk@sina.com.cn'
+    '作者：X-WIDE · xiupk@sina.com.cn'
 )
 $script:creditLinks = @(
     @{ t = 'https://github.com/Zagitta/gpu-unlock'; u = 'https://github.com/Zagitta/gpu-unlock' },
     @{ t = 'https://github.com/windows-GPU-UNLOCK/Windows-GPU-UNLOCK'; u = 'https://github.com/windows-GPU-UNLOCK/Windows-GPU-UNLOCK' }
+)
+# author's own addresses - each one clickable (B 站 / GitHub / 邮箱)
+$script:authorLinks = @(
+    @{ t = 'B 站：space.bilibili.com/374064919'; u = 'https://space.bilibili.com/374064919' },
+    @{ t = 'GitHub：github.com/XWIDE'; u = 'https://github.com/XWIDE' },
+    @{ t = '写信：xiupk@sina.com.cn'; u = 'mailto:xiupk@sina.com.cn' }
 )
 
 # ---------------- main window ----------------
@@ -419,6 +425,11 @@ function New-HelpForm {
     $y += 26
     $c3 = New-Lbl $sp 20 $y 640 20 $script:creditLines[3] 12 $true $C_CYAN
     $y += 24
+    $al1 = New-Link $sp 34 $y 300 20 $script:authorLinks[0].t $script:authorLinks[0].u
+    $al2 = New-Link $sp 340 $y 300 20 $script:authorLinks[1].t $script:authorLinks[1].u
+    $y += 22
+    $al3 = New-Link $sp 34 $y 300 20 $script:authorLinks[2].t $script:authorLinks[2].u
+    $y += 26
     $c4 = New-Lbl $sp 20 $y 640 20 '固件资产不随包分发，由 NVIDIA 开源内核模块源码现场抽取；上游许可证 GPL-2.0 / NVIDIA 生成源文件 MIT。' 12 $false $C_DIM
     $y += 22
     $g.Dispose()
@@ -594,10 +605,11 @@ if ($SelfTest) {
     Note '帮助含开源徽标' ([bool](($ht -match 'gpu-unlock') -and ($ht -match 'GPL-2\.0'))) 'oss badge'
     Note '帮助含作者信息' ([bool]($ht -match '作者')) 'author'
     Note '帮助含已知限制' ([bool]($ht -match '已知限制')) 'limits'
-    $hc = ($script:creditLines -join ' ') + ' ' + (($script:creditLinks | ForEach-Object { $_.t + ' ' + $_.u }) -join ' ')
+    $hc = ($script:creditLines -join ' ') + ' ' + (($script:creditLinks | ForEach-Object { $_.t + ' ' + $_.u }) -join ' ') + ' ' + (($script:authorLinks | ForEach-Object { $_.t + ' ' + $_.u }) -join ' ')
     Note '致谢含最源头链接' ([bool]($hc -match 'Zagitta/gpu-unlock' -and $hc -match 'github\.com/Zagitta/gpu-unlock')) 'root source'
     Note '致谢含 Windows 分支版' ([bool]($hc -match 'windows-GPU-UNLOCK' -and $hc -match 'github\.com/windows-GPU-UNLOCK')) 'windows port'
-    Note '致谢含作者联系方式' ([bool](($hc -match 'X-WIDE') -and ($hc -match '374064919') -and ($hc -match 'xiupk@sina\.com\.cn'))) 'contact'
+    Note '致谢含作者联系方式' ([bool](($hc -match 'X-WIDE') -and ($hc -match 'xiupk@sina\.com\.cn'))) 'contact'
+    Note '致谢含 B 站与 GitHub 地址' ([bool](($hc -match 'space\.bilibili\.com/374064919') -and ($hc -match 'github\.com/XWIDE'))) 'author urls'
     Note '致谢含版本与日期' ([bool](($hc -match 'v3\.1') -and ($hc -match '2026-10-31'))) 'ver+date'
     try {
         $hf = New-HelpForm
@@ -610,8 +622,10 @@ if ($SelfTest) {
                 if (($c.Font.SizeInPoints * 96 / 72) -lt 12) { $hBad++ }
             }
         }
+        $badUrl = @($hLnk | Where-Object { -not ($_.Tag -match '^(https?://|mailto:)') })
         Note '帮助面板元素就位' ([bool](($hAll.Count -ge 14) -and ($hLbl.Count -ge 12))) ('控件=' + $hAll.Count + ' 标签=' + $hLbl.Count)
-        Note '帮助底部可点击链接' ($hLnk.Count -ge 2) ('链接=' + $hLnk.Count)
+        Note '帮助底部可点击链接' (($hLnk.Count -ge 5) -and ($badUrl.Count -eq 0)) ('链接=' + $hLnk.Count + ' 坏链接=' + $badUrl.Count)
+        Note '作者三个地址可点' ([bool](($hLnk | Where-Object { $_.Tag -eq 'https://space.bilibili.com/374064919' }) -and ($hLnk | Where-Object { $_.Tag -eq 'https://github.com/XWIDE' }) -and ($hLnk | Where-Object { $_.Tag -eq 'mailto:xiupk@sina.com.cn' }))) 'bili+github+mail'
         Note '帮助面板字号达标' ($hBad -eq 0) ('违规=' + $hBad)
         $hf.Dispose()
     } catch {
