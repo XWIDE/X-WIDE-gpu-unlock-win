@@ -1,0 +1,21 @@
+# build / runtime artifacts
+build/
+*.sys
+*.exe
+*.obj
+*.o
+*.pdb
+*.lib
+*.exp
+*.log
+
+# firmware blobs (NVIDIA copyright, never redistribute)
+gpu-unlock/
+*.bin
+
+# local scratch
+_tmp/
+_shots/
+*.bak
+*.bak-*
+.deleted-*/
