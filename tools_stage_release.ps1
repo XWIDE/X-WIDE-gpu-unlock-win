@@ -33,7 +33,7 @@ foreach ($d in $sourceDirs) {
     $from = Join-Path $src $d
     if (-not (Test-Path $from)) { continue }
     $to = Join-Path $rel $d
-    $null = robocopy $from $to /E /NFL /NDL /NJH /NJS /XF *.sys *.exe *.bin *.obj *.o *.log *.pdb *.lib *.exp /XD .vs build obj
+    $null = robocopy $from $to /E /NFL /NDL /NJH /NJS /XF *.sys *.exe *.bin *.obj *.o *.log *.pdb *.lib *.exp /XD .vs build obj __pycache__
 }
 
 $installer = Join-Path $rel 'installer'
@@ -69,6 +69,8 @@ gpu-unlock/
 # local scratch
 _tmp/
 _shots/
+__pycache__/
+*.pyc
 *.bak
 *.bak-*
 .deleted-*/

@@ -16,6 +16,8 @@ gpu-unlock/
 # local scratch
 _tmp/
 _shots/
+__pycache__/
+*.pyc
 *.bak
 *.bak-*
 .deleted-*/
