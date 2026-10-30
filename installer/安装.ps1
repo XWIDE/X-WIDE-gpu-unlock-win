@@ -1,15 +1,20 @@
-﻿param([switch]$CheckOnly)
+﻿param([switch]$CheckOnly, [string]$Root)
 
 # 安装开机自动解锁（冷启动路线）
 # 做的事：注册三个计划任务，让每次开机在驱动绑定前解锁显卡。
 # 不做的事：不下载任何东西、不改 VBIOS、不碰 NVIDIA 驱动文件。
 
 $ErrorActionPreference = 'Stop'
+# 解锁程序可能在这些位置，按顺序找第一个能找到 gpu_unlock.exe 的：
+#   -Root 指定 → 脚本同级 → 脚本下的 scripts\ → 上一级
+$candidates = @()
+if ($Root) { $candidates += $Root }
+$candidates += $PSScriptRoot
+$candidates += (Join-Path $PSScriptRoot 'scripts')
+$candidates += (Split-Path $PSScriptRoot -Parent)
 $root = $PSScriptRoot
-# 允许把 安装.ps1 放在子目录里：解锁程序在本目录找不到时，向上找一层。
-if (-not (Test-Path (Join-Path $root 'gpu_unlock.exe'))) {
-	$parent = Split-Path $root -Parent
-	if (Test-Path (Join-Path $parent 'gpu_unlock.exe')) { $root = $parent }
+foreach ($c in $candidates) {
+	if ($c -and (Test-Path (Join-Path $c 'gpu_unlock.exe'))) { $root = $c; break }
 }
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)

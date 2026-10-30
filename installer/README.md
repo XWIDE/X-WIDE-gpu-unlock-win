@@ -120,7 +120,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\安装.ps1 -CheckOnly
 
 | 文件 | 作用 |
 |---|---|
-| `安装.ps1` / `卸载.ps1` | 注册 / 删除计划任务（含环境自检） |
+| `安装.ps1` / `卸载.ps1` | 注册 / 删除计划任务（含环境自检）。解锁程序不在本目录时加 `-Root <目录>` |
+| `extract-assets.py` | 从 NVIDIA 开源内核模块源码抽 Booter / GSP boot 固件（3 个 blob） |
+| `LICENSE` / `NOTICE.md` | GPL-2.0 全文、第三方组件与再分发限制 |
 | `boot-unlock.ps1` | 开机解锁主脚本：冷态判断 → `--cold` 解锁 → 启用显卡 → 复查 |
 | `gpu-disable.ps1` | 关机时禁用显卡 |
 | `rescue-enable.ps1` | 5 分钟兜底：启用显卡 |
