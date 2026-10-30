@@ -1,4 +1,6 @@
-# GPU 解锁 · Windows 开机自动挡
+﻿# GPU 解锁 · Windows 开机自动挡
+
+**中文** | [English](README.en.md)
 
 让 Ampere（RTX 30 系）显卡在 Windows 上打开被厂商锁住的半速张量核：**BF16/FP16 算力约 ×2**。
 不刷 VBIOS、不换驱动、不用 U 盘、不改引导；解锁发生在每次开机、NVIDIA 驱动绑定显卡之前。
@@ -10,6 +12,8 @@
 | BF16 TFLOPS | 56.33 | **116.79** |
 | FP16 TFLOPS | 57.00 | 117.08 |
 | 倍数 | 1.00× | **2.07×** |
+
+![界面：主面板 · 帮助页 · 出处与致谢](docs/images/ui-panel-v3.1.png)
 
 ---
 
