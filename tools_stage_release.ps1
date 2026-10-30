@@ -19,7 +19,7 @@ foreach ($f in $rootFiles) {
     else { Write-Host ("skip missing: " + $f) }
 }
 
-# 仓库首页用自己写的那份；上游的两份 README 改名保留作参考。
+# Repo landing page comes from docs\REPO-README.md; upstream READMEs are kept renamed.
 $repoReadme = Join-Path $src 'docs\REPO-README.md'
 if (Test-Path $repoReadme) { Copy-Item $repoReadme (Join-Path $rel 'README.md') -Force }
 else { Write-Host 'skip missing: docs\REPO-README.md' }
