@@ -18,6 +18,29 @@ Measured on an RTX 3090 Ti, driver 617.42, Windows 10 19041 (median of 3 runs):
 
 ---
 
+## Which cards are supported (read this first)
+
+| Chip | Cards | Status |
+|---|---|---|
+| **GA102** | 3090 Ti / 3090 / 3080 Ti / 3080 / A6000 | ✅ **validated on real hardware** (this project was developed and measured on one) |
+| GA104 / GA106 / GA107 | 3070 / 3060 Ti / **3060** | ❌ **not possible** — see below, do not try |
+| Ada (RTX 40) | 4070 / 4080 / 4090 … | ⚠️ upstream marks it experimental; not validated here |
+| Blackwell (RTX 50) | 50xx | ❌ unsupported upstream |
+
+### Why 3060 / 3070 cannot work (measured 2026-11-01, not a guess)
+
+The unlock has to boot the GSP **itself, before the NVIDIA driver binds the card**, which requires the **per-chip BooterLoad data**. Three sources were checked:
+
+1. **NVIDIA's open kernel module sources** (`NVIDIA-kernel-module-source-610.43.03.tar.xz`, 3868 entries): that data exists for only five chips — `TU116 / TU102 / AD102 / GA102 / GA100`. **No GA104 / GA106 / GA107.**
+2. **The official driver installer** (`NVIDIA-Linux-x86_64-610.43.03.run`, 440 MB, 1189 entries once unpacked): it carries only the generic `firmware/gsp_ga10x.bin` (84 MB), `gsp_tu10x.bin`, `ucodes_ga10x.bin`, `ucodes_tu10x.bin`. Members matching `ga104/ga106/ga107`: **0**. Members matching `booter`: **0**.
+3. **The upstream extractor** (`firmware/extract_gsp.py`): also only pulls those two generic blobs out of the `.run`; every per-chip boot asset comes from the open module sources.
+
+The generic blob cannot substitute: `gsp_ga10x.bin` is the GSP **runtime** firmware, while **starting** the GSP needs the chip-specific booter. So on a 3060 this is not a misconfiguration and not "not ported yet" — **the data does not exist**.
+
+> 3060 / 3070 / 3060 Ti owners: there is nothing in this repository that will work on your card. Do not spend time downloading it.
+
+---
+
 ## What this repository is
 
 Upstream [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) is a Linux kernel module that unlocks the card
@@ -77,7 +100,7 @@ See also [`installer/README.md`](installer/README.md).
 |---|---|
 | GA102 (3090 Ti / 3090 / 3080 Ti / 3080 / A6000) | **validated on real hardware** (cold-boot path, fully automatic 3-task loop) |
 | GA102 firmware assets reproducible | **validated**: the 3 blobs produced by `extract-assets.py` from the official 610.43.03 sources are byte-identical to the released ones |
-| ga104 / ga106 / ga107 (3070 / 3060 Ti / 3060) | not implemented: NVIDIA's open sources contain no per-chip boot data for these chips — the 610.43.03 archive only ships `TU116 / TU102 / AD102 / GA102 / GA100` (`g_bindata_kgspGetBinArchiveBooterLoadUcode_*`), and the `.run` installer only carries the generic `gsp_ga10x.bin` |
+| ga104 / ga106 / ga107 (3070 / 3060 Ti / 3060) | ❌ not possible — evidence in the "Which cards are supported" section above |
 | Ada (RTX 40) | upstream marks it experimental; not validated here |
 | Blackwell (RTX 50) | unsupported |
 | Multi-GPU / sleep-resume | not implemented |
