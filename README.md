@@ -1,4 +1,4 @@
-﻿# GPU 解锁 · Windows 开机自动挡
+# GPU 解锁 · Windows 开机自动挡
 
 **中文** | [English](README.en.md)
 
@@ -65,7 +65,7 @@ powershell -File tools_sign.ps1         # 自签名（需 testsigning）
 |---|---|
 | GA102（3090 Ti / 3090 / 3080 Ti / 3080 / A6000） | **真机验证通过**（冷启动路径 + 三任务全自动闭环） |
 | GA102 固件资产可复现 | **验证通过**（`extract-assets.py` 从官方 610.43.03 源码抽出的 3 个 blob 与发布版逐字节相同） |
-| ga104 / ga106 / ga107（3070 / 3060 Ti / 3060） | 未实现：NVIDIA 开源源码里没有这些芯片的生成文件，需走驱动挖固件路线 |
+| ga104 / ga106 / ga107（3070 / 3060 Ti / 3060） | 未实现：610.43.03 源码里 per-chip 启动数据只有 `TU116 / TU102 / AD102 / GA102 / GA100` 五个（`g_bindata_kgspGetBinArchiveBooterLoadUcode_*`），`.run` 安装包里也只有通用的 `gsp_ga10x.bin` —— 没有 3060 可用的固件，别白试 |
 | Ada（40 系） | 上游标实验性；本仓库未验证 |
 | Blackwell（50 系） | 不支持 |
 | 多卡 / 睡眠恢复 | 未实现 |

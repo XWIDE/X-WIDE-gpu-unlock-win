@@ -1,4 +1,4 @@
-﻿# GPU Unlock · Windows Boot-Time Edition
+# GPU Unlock · Windows Boot-Time Edition
 
 [中文](README.md) | **English**
 
@@ -60,16 +60,15 @@ powershell -File tools_sign.ps1         # self-sign (testsigning required)
 
 ## Install (end users)
 
-Two ready-to-use packages are attached to the [Releases](https://github.com/XWIDE/X-WIDE-gpu-unlock-win/releases) page:
+One all-in-one package is attached to the [Releases](https://github.com/XWIDE/X-WIDE-gpu-unlock-win/releases) page:
 
 | Asset | Use |
 |---|---|
-| `GPU-UNLOCK-v3.1-win64-portable.zip` (~70 MB) | everything: binary, driver, certificate, firmware, GUI panel, installer, sources |
-| `GPU-UNLOCK-v3.1-source.zip` (~0.2 MB) | source-only (no exe/sys/bin), for audit or rebuild |
+| `GPU-UNLOCK-v3.1.1-full.zip` (~70 MB) | everything: binary, driver, certificate, firmware, GUI panel, installer, **and full sources** |
 
-The portable package ships `如何安装.txt` (Chinese step-by-step) and `INSTALL.bat`.
-Short version: disable Secure Boot → enable test signing → trust `gpuunlock-test.cer` → reboot →
-run `installer\install.ps1` (or `INSTALL.bat`) → shut down (not restart) and power on.
+The package ships `如何安装.txt` (Chinese step-by-step) and `INSTALL.bat`, and the same sources are in the repo for audit.
+Short version: run `enable-test-signing.ps1` (imports the bundled certificate and enables test signing) → reboot →
+run `INSTALL.bat` (or `installer\install.ps1`) → shut down (not restart) and power on.
 See also [`installer/README.md`](installer/README.md).
 
 ## Status
@@ -78,7 +77,7 @@ See also [`installer/README.md`](installer/README.md).
 |---|---|
 | GA102 (3090 Ti / 3090 / 3080 Ti / 3080 / A6000) | **validated on real hardware** (cold-boot path, fully automatic 3-task loop) |
 | GA102 firmware assets reproducible | **validated**: the 3 blobs produced by `extract-assets.py` from the official 610.43.03 sources are byte-identical to the released ones |
-| ga104 / ga106 / ga107 (3070 / 3060 Ti / 3060) | not implemented: NVIDIA's open sources contain no generated files for these chips; would need extraction from the driver |
+| ga104 / ga106 / ga107 (3070 / 3060 Ti / 3060) | not implemented: NVIDIA's open sources contain no per-chip boot data for these chips — the 610.43.03 archive only ships `TU116 / TU102 / AD102 / GA102 / GA100` (`g_bindata_kgspGetBinArchiveBooterLoadUcode_*`), and the `.run` installer only carries the generic `gsp_ga10x.bin` |
 | Ada (RTX 40) | upstream marks it experimental; not validated here |
 | Blackwell (RTX 50) | unsupported |
 | Multi-GPU / sleep-resume | not implemented |
