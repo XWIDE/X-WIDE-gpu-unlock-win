@@ -93,6 +93,15 @@ powershell -File tools_sign.ps1         # 自签名（需 testsigning）
 | Blackwell（50 系） | 不支持 |
 | 多卡 / 睡眠恢复 | 未实现 |
 
+## 装完右下角出现「测试模式」水印，正常吗？
+
+**正常，每个装这个包的人都会有**，不是装坏了，也不是病毒。
+
+- 原因：`gpuunlock.sys` 是自签名驱动，Windows 只允许「测试签名模式」加载自签名驱动，所以安装第一步必须 `bcdedit /set testsigning on`。开了它，Windows 就在桌面右下角画「测试模式 / Windows 10 专业版 / Build …」三行字。
+- **去不掉**：只要还开着测试签名，这个水印就一直画在桌面上；改注册表、换壁纸、`PaintDesktopVersion=0` 都管不住（实测该值本来就是 0，水印照样在）。
+- **关掉会怎样**：`bcdedit /set testsigning off` 后水印消失，但自签名驱动就加载不了 → 解锁直接失效。所以不能为了好看关它。
+- **想彻底干净的唯一办法**：给驱动做正式签名（EV 代码签名证书 + Microsoft attestation 提交，几百美元/年 + 几天审核），之后 `testsigning off`，水印消失且解锁照跑。这属于成本与账号问题，本仓库不提供证书。
+
 ## 许可证
 
 GPL-2.0（全文 `LICENSE`）。第三方组件、NVIDIA 固件的再分发限制见 `NOTICE.md`；

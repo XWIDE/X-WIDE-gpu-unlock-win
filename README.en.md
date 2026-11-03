@@ -105,6 +105,15 @@ See also [`installer/README.md`](installer/README.md).
 | Blackwell (RTX 50) | unsupported |
 | Multi-GPU / sleep-resume | not implemented |
 
+## Why does "Test Mode" appear in the bottom-right corner, and can I remove it?
+
+**It is normal — everyone who installs this package gets it.** Nothing is broken and it is not malware.
+
+- Cause: `gpuunlock.sys` is a self-signed driver, and Windows only loads self-signed kernel drivers while **test signing** is enabled, so setup step 1 must run `bcdedit /set testsigning on`. Windows then paints "Test Mode / Windows 10 Pro / Build …" on the desktop.
+- **It cannot be removed** while test signing stays on. Registry tweaks, wallpapers and `PaintDesktopVersion=0` do not touch it (that value is already 0 here and the text is still drawn).
+- **Turning test signing off** removes the text, but the self-signed driver then fails to load, so the unlock stops working.
+- **The only clean way** is proper driver signing (EV code-signing certificate + Microsoft attestation submission — hundreds of USD per year plus a few days of review). After that you can disable test signing: no watermark, unlock still works. This repository does not ship a certificate.
+
 ## License
 
 GPL-2.0 (full text in `LICENSE`). Third-party components and the NVIDIA firmware redistribution limits are described in
