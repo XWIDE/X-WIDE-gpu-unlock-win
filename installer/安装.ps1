@@ -29,7 +29,8 @@ $need = @(
 	'gpuunlock.sys',
 	'boot-unlock.ps1',
 	'gpu-disable.ps1',
-	'rescue-enable.ps1'
+	'rescue-enable.ps1',
+	'desk-fix.ps1'
 )
 
 function Line([string]$name, [bool]$ok, [string]$extra) {
@@ -99,17 +100,26 @@ $tasks = @(
 		desc = '关机时禁用显卡，让下次开机是冷态'
 		script = 'gpu-disable.ps1'
 		trigger = '<EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[EventID=1074]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription></EventTrigger>'
+	},
+	@{
+		name = 'GpuUnlockDeskFix'
+		desc = '登录后恢复桌面图标大小（顺手修好桌面图标层）'
+		script = 'desk-fix.ps1'
+		trigger = '<LogonTrigger><Enabled>true</Enabled><UserId>' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '</UserId><Delay>PT20S</Delay></LogonTrigger>'
+		user = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 	}
 )
 
 foreach ($t in $tasks) {
 	$scriptPath = Join-Path $root $t.script
+	$runAs = 'S-1-5-18'
+	if ($t.user) { $runAs = $t.user }
 	$xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo><Description>$($t.desc)</Description></RegistrationInfo>
   <Triggers>$($t.trigger)</Triggers>
-  <Principals><Principal id="Author"><UserId>S-1-5-18</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
+  <Principals><Principal id="Author"><UserId>$runAs</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
@@ -156,3 +166,13 @@ Write-Host '安装完成。'
 Write-Host '接下来：正常关机 → 开机时自动解锁 → 进桌面就是解锁状态。'
 Write-Host ('日志目录：' + (Join-Path $env:ProgramData 'GpuUnlock'))
 Write-Host '想撤销：跑同目录的 卸载.ps1'
+
+# 顺手把桌面图标恢复成 64px（不重启资源管理器就等下次登录由 GpuUnlockDeskFix 生效）
+$deskFix = Join-Path $root 'desk-fix.ps1'
+if (Test-Path $deskFix) {
+	Write-Host ''
+	Write-Host '=== 桌面图标 ==='
+	$env:GU_NO_PAUSE = '1'
+	try { & $deskFix -IconSize 64 -NoPause | ForEach-Object { Write-Host ('  ' + $_) } } catch { Write-Host ('  桌面修复跳过：' + $_.Exception.Message) }
+	Write-Host '  图标大小可在 GPU 解锁面板里点「图标 大 + / 图标 小 −」随时调整'
+}

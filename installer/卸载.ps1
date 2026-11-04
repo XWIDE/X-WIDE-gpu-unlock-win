@@ -1,7 +1,7 @@
 ﻿param([switch]$KeepTasks)
 
 # 卸载开机自动解锁，恢复成普通电脑的状态。
-# 做的事：删掉三个计划任务；如果显卡处于禁用状态就启用回来。
+# 做的事：删掉四个计划任务（含桌面图标修复）；如果显卡处于禁用状态就启用回来。
 # 不会做的事：不改注册表其它地方、不删日志、不碰 NVIDIA 驱动。
 
 $ErrorActionPreference = 'Continue'
@@ -16,7 +16,7 @@ if (-not $isAdmin) {
 function Say([string]$m) { Write-Host $m }
 
 if (-not $KeepTasks) {
-	foreach ($t in 'GpuUnlockBoot', 'GpuUnlockOff', 'GpuUnlockBootRescue') {
+	foreach ($t in 'GpuUnlockBoot', 'GpuUnlockOff', 'GpuUnlockBootRescue', 'GpuUnlockDeskFix') {
 		$task = Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
 		if (-not $task) { Say ('[ -- ] ' + $t + '  本来就没有'); continue }
 		try {
@@ -27,7 +27,7 @@ if (-not $KeepTasks) {
 		}
 	}
 } else {
-	foreach ($t in 'GpuUnlockBoot', 'GpuUnlockOff', 'GpuUnlockBootRescue') {
+	foreach ($t in 'GpuUnlockBoot', 'GpuUnlockOff', 'GpuUnlockBootRescue', 'GpuUnlockDeskFix') {
 		$r = & schtasks.exe /change /tn $t /disable 2>&1
 		Say ('[ -- ] ' + $t + '  ' + (($r -join ' ').Trim()))
 	}

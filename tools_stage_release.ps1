@@ -42,7 +42,8 @@ $scriptDir = Join-Path $installer 'scripts'
 New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
 $distScripts = @(
     'boot-unlock.ps1', 'gpu-disable.ps1', 'rescue-enable.ps1',
-    'gpu-panel-v3.ps1', 'GPU-panel-v3.bat', 'enable-test-signing.ps1', 'bf16_probe.py'
+    'gpu-panel-v3.ps1', 'GPU-panel-v3.bat', 'enable-test-signing.ps1', 'bf16_probe.py',
+    'desk-fix.ps1'
 )
 foreach ($f in $distScripts) {
     $p = Join-Path $src ('dist\' + $f)

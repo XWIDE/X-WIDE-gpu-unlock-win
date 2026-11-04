@@ -1,6 +1,6 @@
 ﻿param([switch]$SelfTest, [switch]$Shot)
 
-# GPU unlock panel v3.1 - dark tech redesign (2026-10-31)
+# GPU unlock panel v3.2 - dark tech redesign + desktop icon repair (2026-11-04)
 # Same engine as v3: the only working unlock path is the boot-time cold unlock done by
 # the three scheduled tasks, because by the time Windows is up nvlddmkm owns the card
 # and the GSP firmware is already running (selector write then fails with -138).
@@ -18,7 +18,9 @@ $taskOff = 'GpuUnlockOff'
 $taskRescue = 'GpuUnlockBootRescue'
 $logRoot = Join-Path $env:ProgramData 'GpuUnlock'
 $benchCache = Join-Path $logRoot 'last-bench.txt'
-$ver = '3.1'
+$deskFix = Join-Path $root 'desk-fix.ps1'
+$deskCfg = Join-Path $logRoot 'desk.cfg'
+$ver = '3.2'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin -and -not $SelfTest -and -not $Shot) {
@@ -156,7 +158,7 @@ $script:helpTitle = 'GPU-UNLOCK · 使用说明与开源信息'
 
 # footer credits shown at the very bottom of the help page (clickable links included)
 $script:creditLines = @(
-    '本包：GPU-UNLOCK · Windows 开机自动挡 v3.1 · 2026-10-31 · 许可证 GPL-2.0',
+    '本包：GPU-UNLOCK · Windows 开机自动挡 v3.2 · 2026-11-04 · 许可证 GPL-2.0',
     '最源头：Zagitta/gpu-unlock（Linux 内核模块，整套解锁技术的原始出处，GPL-2.0）',
     'Windows 分支版：windows-GPU-UNLOCK（EFI 预启动解锁路线，与本包同一技术脉络）',
     '作者：X-WIDE · xiupk@sina.com.cn'
@@ -228,10 +230,15 @@ $btnUnlock = New-Btn $form 18 396 300 48 '一键解锁（会重启一次）' $C_
 $btnMeasure = New-Btn $form 330 396 250 48 '测一下当前算力' $C_DARKBLUE 16
 $btnRestore = New-Btn $form 592 396 410 48 '恢复原样（关掉自动挡）' $C_DANGER 16
 
-$lblLogT = New-Lbl $form 18 458 400 22 '运行记录' 13 $true $C_TXT
+$btnDesk = New-Btn $form 18 452 300 40 '桌面修复（图标大小）' $C_CHIP 14
+$btnIconDown = New-Btn $form 330 452 120 40 '图标 小 −' $C_CHIP 14
+$btnIconUp = New-Btn $form 462 452 120 40 '图标 大 +' $C_CHIP 14
+$lblIconSize = New-Lbl $form 592 458 410 28 '当前图标 64 px（点上面按钮调整）' 13 $false $C_MUT
+
+$lblLogT = New-Lbl $form 18 500 400 22 '运行记录' 13 $true $C_TXT
 $txtLog = New-Object System.Windows.Forms.TextBox
-$txtLog.Location = New-Object System.Drawing.Point(18, 484)
-$txtLog.Size = New-Object System.Drawing.Size(984, 176)
+$txtLog.Location = New-Object System.Drawing.Point(18, 524)
+$txtLog.Size = New-Object System.Drawing.Size(984, 132)
 $txtLog.Multiline = $true
 $txtLog.ReadOnly = $true
 $txtLog.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
@@ -521,10 +528,71 @@ $btnRestore.Add_Click({
     Update-Tasks | Out-Null
 })
 
+# ---------------- desktop icon repair ----------------
+function Get-DeskSize {
+    $s = 64
+    if (Test-Path -LiteralPath $deskCfg) {
+        foreach ($l in (Get-Content -LiteralPath $deskCfg -Encoding UTF8)) {
+            if ($l -match '^\s*IconSize\s*=\s*(\d+)\s*$') { $s = [int]$matches[1] }
+        }
+    } else {
+        $k = 'HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop'
+        $v = (Get-ItemProperty -Path $k -Name IconSize -ErrorAction SilentlyContinue).IconSize
+        if ($null -ne $v) { $s = [int]$v }
+    }
+    return $s
+}
+
+function Update-DeskLabel {
+    $s = Get-DeskSize
+    $lblIconSize.Text = ('当前图标 ' + $s + ' px（点上面按钮调整）')
+    $lblIconSize.ForeColor = $C_MUT
+}
+
+function Invoke-DeskFix([int]$size) {
+    if (-not (Test-Path -LiteralPath $deskFix)) {
+        Log ('缺少桌面修复脚本：' + $deskFix)
+        return $false
+    }
+    Log ('桌面修复：图标 ' + $size + ' px，必要时会重启一次资源管理器（任务栏闪一下）')
+    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $dargs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $deskFix + '"'), '-IconSize', $size.ToString(), '-NoPause')
+    if ($isAdmin) { $dargs += '-Stop360' }
+    $env:GU_NO_PAUSE = '1'
+    $r = Invoke-Cmd $ps $dargs
+    foreach ($ln in ($r.out -split "`r?`n")) {
+        if ($ln -match '=== desk-fix|before:|after:|restarting|stopped:|still missing|cannot stop') { Log ('  ' + $ln.Trim()) }
+    }
+    Update-DeskLabel
+    if ($r.out -match 'ok=True') { Log '桌面修复完成' } else { Log '桌面修复未完全成功，日志：C:\ProgramData\GpuUnlock\desk-fix.log' }
+    return ($r.out -match 'ok=True')
+}
+
+$btnDesk.Add_Click({
+    $s = Get-DeskSize
+    Log '手动执行桌面修复（图标层缺失才会重启资源管理器）'
+    Invoke-DeskFix $s | Out-Null
+})
+
+$btnIconDown.Add_Click({
+    $s = Get-DeskSize
+    $n = $s - 16
+    if ($n -lt 32) { $n = 32 }
+    Invoke-DeskFix $n | Out-Null
+})
+
+$btnIconUp.Add_Click({
+    $s = Get-DeskSize
+    $n = $s + 16
+    if ($n -gt 128) { $n = 128 }
+    Invoke-DeskFix $n | Out-Null
+})
+
 $form.Add_Shown({
     Read-State $false | Out-Null
     Update-Tasks | Out-Null
     if (Load-BenchCache) { Log '已载入上次算力读数（点「测一下当前算力」可刷新）' }
+    Update-DeskLabel
     Log ('显示：' + (Get-Detail))
     Log ('面板版本 ' + $ver + ' · 深色版 · 解锁路径：开机冷启动（--cold）')
 })
@@ -610,7 +678,7 @@ if ($SelfTest) {
     Note '致谢含 Windows 分支版' ([bool]($hc -match 'windows-GPU-UNLOCK' -and $hc -match 'github\.com/windows-GPU-UNLOCK')) 'windows port'
     Note '致谢含作者联系方式' ([bool](($hc -match 'X-WIDE') -and ($hc -match 'xiupk@sina\.com\.cn'))) 'contact'
     Note '致谢含 B 站与 GitHub 地址' ([bool](($hc -match 'space\.bilibili\.com/374064919') -and ($hc -match 'github\.com/XWIDE'))) 'author urls'
-    Note '致谢含版本与日期' ([bool](($hc -match 'v3\.1') -and ($hc -match '2026-10-31'))) 'ver+date'
+    Note '致谢含版本与日期' ([bool](($hc -match ('v' + [regex]::Escape($ver))) -and ($hc -match '2026-11-04'))) 'ver+date'
     try {
         $hf = New-HelpForm
         $hAll = @(Get-AllControls $hf)
@@ -636,6 +704,12 @@ if ($SelfTest) {
     Note '任务名在位' ([bool](($src -match 'GpuUnlockOff') -and ($src -match 'GpuUnlockBoot'))) 'boot+off+rescue'
     Note 'exe 存在' (Test-Path $exe) $exe
     Note '测速脚本存在' (Test-Path $probePy) 'bf16_probe.py'
+    Note '桌面修复脚本存在' (Test-Path -LiteralPath $deskFix) 'desk-fix.ps1'
+    Note '桌面三按钮命中区' (($btnDesk.Height -ge 32) -and ($btnIconUp.Height -ge 32) -and ($btnIconDown.Height -ge 32)) ('h=' + $btnDesk.Height)
+    $allD = @(Get-AllControls $form)
+    Note '桌面三按钮真在窗体上' ([bool](($allD -contains $btnDesk) -and ($allD -contains $btnIconUp) -and ($allD -contains $btnIconDown))) 'Contains=True'
+    $dSize = Get-DeskSize
+    Note '图标尺寸读数合理' (($dSize -ge 32) -and ($dSize -le 128)) ('size=' + $dSize)
     $tn = @([regex]::Matches($src, '\[System\.Windows\.Forms\.[A-Za-z]+\]') | ForEach-Object { $_.Value } | Sort-Object -Unique)
     $badT = 0
     foreach ($t in $tn) {
