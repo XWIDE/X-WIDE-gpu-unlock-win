@@ -1,4 +1,4 @@
-# GPU 解锁 · Windows 开机自动挡
+﻿# GPU 解锁 · Windows 开机自动挡
 
 **中文** | [English](README.en.md)
 
