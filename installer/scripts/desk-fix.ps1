@@ -5,9 +5,11 @@
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -IconSize 96 # set and save a new size
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -CheckOnly   # report only, change nothing
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -Stop360     # also stop 360 desktop helper (needs admin)
+#   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -KeepMinutes 30  # keep watching, undo resets
 
 param(
     [int]$IconSize = 0,
+    [int]$KeepMinutes = 0,
     [switch]$CheckOnly,
     [switch]$Stop360,
     [switch]$NoPause
@@ -67,6 +69,15 @@ public class DeskFix {
         }, IntPtr.Zero);
         return found;
     }
+    // LVM_GETITEMSPACING (0x1033): LOWORD = cx, HIWORD = cy, both in pixels
+    public static int[] Spacing() {
+        IntPtr lv = FindDesktopListview();
+        if (lv == IntPtr.Zero) { return new int[] { -1, -1 }; }
+        long r = (long)SendMessage(lv, 0x1033, IntPtr.Zero, IntPtr.Zero);
+        int cx = (int)(r & 0xFFFF);
+        int cy = (int)((r >> 16) & 0xFFFF);
+        return new int[] { cx, cy };
+    }
 }
 "@
 try { Add-Type -TypeDefinition $sig -ErrorAction Stop } catch { }
@@ -75,6 +86,11 @@ function Get-DesktopIconCount {
     $lv = [DeskFix]::FindDesktopListview()
     if ($lv -eq [IntPtr]::Zero) { return -1 }
     return [int][DeskFix]::SendMessage($lv, 0x1004, [IntPtr]::Zero, [IntPtr]::Zero)
+}
+
+function Get-DesktopSpacingCY {
+    $s = [DeskFix]::Spacing()
+    return [int]$s[1]
 }
 
 $bagsKey = 'HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop'
@@ -122,7 +138,7 @@ function Stop-360Desktop {
 }
 
 # ---------- main ----------
-Write-Log ('=== desk-fix start  desired=' + $IconSize + '  admin=' + ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) + '  checkOnly=' + [bool]$CheckOnly + ' ===')
+Write-Log ('=== desk-fix start  desired=' + $IconSize + '  keepMin=' + $KeepMinutes + '  admin=' + ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) + '  checkOnly=' + [bool]$CheckOnly + ' ===')
 
 $cur = Get-IconSizeReg
 $icons = Get-DesktopIconCount
@@ -153,6 +169,49 @@ $finalSize = Get-IconSizeReg
 $finalIcons = Get-DesktopIconCount
 $ok = ($finalSize -eq $IconSize) -and ($finalIcons -ge 0)
 Write-Log ('after: registry IconSize=' + $finalSize + '  live icons=' + $finalIcons + '  ok=' + $ok)
+
+# ---------- watch mode ----------
+# Windows asks for the icon size through the registry, but a third-party desktop
+# helper (360 desktop assistant and friends) can write it back later. Keep an eye
+# on it for a while and undo the reset instead of fighting it at boot time only.
+if ((-not $CheckOnly) -and $KeepMinutes -gt 0) {
+    $baseCY = -1
+    if ($finalIcons -ge 0) { $baseCY = Get-DesktopSpacingCY }
+    Write-Log ('watch: every 60s for ' + $KeepMinutes + ' min  baselineCY=' + $baseCY)
+    $deadline = (Get-Date).AddMinutes($KeepMinutes)
+    $fixes = 0
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 60
+        $wSize = Get-IconSizeReg
+        $wIcons = Get-DesktopIconCount
+        if ($wIcons -lt 0) {
+            Write-Log ('watch: icon layer missing again, repairing')
+            Restart-Desktop | Out-Null
+            $fixes++
+            continue
+        }
+        $wCY = Get-DesktopSpacingCY
+        $reset = ($wSize -ne $IconSize)
+        $shrunk = ($baseCY -gt 0 -and $wCY -gt 0 -and $wCY -lt ($baseCY - 2))
+        if ($reset -or $shrunk) {
+            Write-Log ('watch: reset detected (registry ' + $wSize + ' wanted ' + $IconSize + ', spacingCY ' + $wCY + ' baseline ' + $baseCY + '), re-applying')
+            Set-IconSizeReg $IconSize
+            Restart-Desktop | Out-Null
+            $baseCY = Get-DesktopSpacingCY
+            $fixes++
+            continue
+        }
+        Write-Log ('watch: ok registry=' + $wSize + ' spacingCY=' + $wCY + ' icons=' + $wIcons)
+    }
+    Write-Log ('watch: finished, corrections=' + $fixes)
+}
+
+$finalSize = Get-IconSizeReg
+$finalIcons = Get-DesktopIconCount
+$finalCY = -1
+if ($finalIcons -ge 0) { $finalCY = Get-DesktopSpacingCY }
+$ok = ($finalSize -eq $IconSize) -and ($finalIcons -ge 0)
+Write-Log ('final: registry IconSize=' + $finalSize + '  spacingCY=' + $finalCY + '  live icons=' + $finalIcons + '  ok=' + $ok)
 Write-Log '=== desk-fix end ==='
 
 if (-not $NoPause -and -not $CheckOnly -and $env:GU_NO_PAUSE -ne '1') {
