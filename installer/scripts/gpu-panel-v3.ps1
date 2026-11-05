@@ -1,6 +1,6 @@
 ﻿param([switch]$SelfTest, [switch]$Shot)
 
-# GPU unlock panel v3.2 - dark tech redesign + desktop icon repair (2026-11-04)
+# GPU unlock panel v3.2.1 - dark tech redesign + desktop icon repair (2026-11-04)
 # Same engine as v3: the only working unlock path is the boot-time cold unlock done by
 # the three scheduled tasks, because by the time Windows is up nvlddmkm owns the card
 # and the GSP firmware is already running (selector write then fails with -138).
@@ -20,7 +20,7 @@ $logRoot = Join-Path $env:ProgramData 'GpuUnlock'
 $benchCache = Join-Path $logRoot 'last-bench.txt'
 $deskFix = Join-Path $root 'desk-fix.ps1'
 $deskCfg = Join-Path $logRoot 'desk.cfg'
-$ver = '3.2'
+$ver = '3.2.2'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin -and -not $SelfTest -and -not $Shot) {
@@ -158,7 +158,7 @@ $script:helpTitle = 'GPU-UNLOCK · 使用说明与开源信息'
 
 # footer credits shown at the very bottom of the help page (clickable links included)
 $script:creditLines = @(
-    '本包：GPU-UNLOCK · Windows 开机自动挡 v3.2 · 2026-11-04 · 许可证 GPL-2.0',
+    '本包：GPU-UNLOCK · Windows 开机自动挡 v3.2.2 · 2026-11-05 · 许可证 GPL-2.0',
     '最源头：Zagitta/gpu-unlock（Linux 内核模块，整套解锁技术的原始出处，GPL-2.0）',
     'Windows 分支版：windows-GPU-UNLOCK（EFI 预启动解锁路线，与本包同一技术脉络）',
     '作者：X-WIDE · xiupk@sina.com.cn'
@@ -678,7 +678,7 @@ if ($SelfTest) {
     Note '致谢含 Windows 分支版' ([bool]($hc -match 'windows-GPU-UNLOCK' -and $hc -match 'github\.com/windows-GPU-UNLOCK')) 'windows port'
     Note '致谢含作者联系方式' ([bool](($hc -match 'X-WIDE') -and ($hc -match 'xiupk@sina\.com\.cn'))) 'contact'
     Note '致谢含 B 站与 GitHub 地址' ([bool](($hc -match 'space\.bilibili\.com/374064919') -and ($hc -match 'github\.com/XWIDE'))) 'author urls'
-    Note '致谢含版本与日期' ([bool](($hc -match ('v' + [regex]::Escape($ver))) -and ($hc -match '2026-11-04'))) 'ver+date'
+    Note '致谢含版本与日期' ([bool](($hc -match ('v' + [regex]::Escape($ver))) -and ($hc -match '2026-11-05'))) 'ver+date'
     try {
         $hf = New-HelpForm
         $hAll = @(Get-AllControls $hf)

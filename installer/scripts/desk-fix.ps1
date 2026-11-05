@@ -6,10 +6,12 @@
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -CheckOnly   # report only, change nothing
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -Stop360     # also stop 360 desktop helper (needs admin)
 #   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -KeepMinutes 30  # keep watching, undo resets
+#   powershell -ExecutionPolicy Bypass -File desk-fix.ps1 -Reflow      # move icons that sit outside the visible desktop back in
 
 param(
     [int]$IconSize = 0,
     [int]$KeepMinutes = 0,
+    [switch]$Reflow,
     [switch]$CheckOnly,
     [switch]$Stop360,
     [switch]$NoPause
@@ -78,6 +80,103 @@ public class DeskFix {
         int cy = (int)((r >> 16) & 0xFFFF);
         return new int[] { cx, cy };
     }
+
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+    [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern IntPtr GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint acc, bool inh, uint pid);
+    [DllImport("kernel32.dll")] public static extern IntPtr VirtualAllocEx(IntPtr hp, IntPtr addr, IntPtr size, uint type, uint prot);
+    [DllImport("kernel32.dll")] public static extern bool VirtualFreeEx(IntPtr hp, IntPtr addr, IntPtr size, uint type);
+    [DllImport("kernel32.dll")] public static extern bool ReadProcessMemory(IntPtr hp, IntPtr addr, byte[] buf, IntPtr size, out IntPtr read);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+
+    // Icons keep pixel coordinates. When the display scale, resolution or icon size
+    // changes, icons that used to fit can end up outside the visible desktop, and
+    // Explorer does not pull them back. This moves only the ones that are outside.
+    public static string Reflow() {
+        IntPtr lv = FindDesktopListview();
+        if (lv == IntPtr.Zero) { return "no-listview"; }
+        RECT rc;
+        if (!GetClientRect(lv, out rc)) { return "no-rect"; }
+        int cw = rc.R, ch = rc.B;
+        int count = (int)SendMessage(lv, 0x1004, IntPtr.Zero, IntPtr.Zero);
+        long sp = (long)SendMessage(lv, 0x1033, IntPtr.Zero, IntPtr.Zero);
+        int cx = (int)(sp & 0xFFFF), cy = (int)((sp >> 16) & 0xFFFF);
+        if (cx <= 0 || cy <= 0) { return "no-spacing"; }
+        int cols = cw / cx, rows = ch / cy;
+        if (cols < 1) { cols = 1; }
+        if (rows < 1) { rows = 1; }
+        if (cols * rows < count) {
+            return "capacity " + cols + "x" + rows + "=" + (cols * rows) + " < icons " + count + ", not moved";
+        }
+        uint pid;
+        GetWindowThreadProcessId(lv, out pid);
+        IntPtr hp = OpenProcess(0x0008 | 0x0010 | 0x0020 | 0x0400, false, pid);
+        if (hp == IntPtr.Zero) { return "no-process"; }
+        IntPtr pt = VirtualAllocEx(hp, IntPtr.Zero, (IntPtr)16, 0x3000, 0x04);
+        if (pt == IntPtr.Zero) { CloseHandle(hp); return "no-memory"; }
+        bool[] used = new bool[cols * rows];
+        int off = 0, moved = 0;
+        byte[] raw = new byte[8];
+        for (int i = 0; i < count; i++) {
+            SendMessage(lv, 0x1010, (IntPtr)i, pt);
+            IntPtr rd;
+            ReadProcessMemory(hp, pt, raw, (IntPtr)8, out rd);
+            int x = BitConverter.ToInt32(raw, 0);
+            int y = BitConverter.ToInt32(raw, 4);
+            int col = (int)Math.Round((double)x / cx);
+            int row = (int)Math.Round((double)y / cy);
+            bool outside = x < 0 || y < 0 || (x + cx) > cw || (y + cy) > ch;
+            if (!outside) {
+                if (col >= 0 && col < cols && row >= 0 && row < rows) { used[col * rows + row] = true; }
+                continue;
+            }
+            off++;
+            int slot = -1;
+            for (int s = 0; s < used.Length; s++) { if (!used[s]) { slot = s; break; } }
+            if (slot < 0) { continue; }
+            used[slot] = true;
+            int nc = slot / rows, nr = slot % rows;
+            long lp = (((long)(nr * cy) & 0xFFFF) << 16) | ((long)(nc * cx) & 0xFFFF);
+            SendMessage(lv, 0x100F, (IntPtr)i, (IntPtr)lp);
+            moved++;
+        }
+        VirtualFreeEx(hp, pt, IntPtr.Zero, 0x8000);
+        CloseHandle(hp);
+        return "cols=" + cols + " rows=" + rows + " capacity=" + (cols * rows) + " icons=" + count + " offscreen=" + off + " moved=" + moved;
+    }
+
+    // how many icons currently sit outside the visible desktop area
+    public static int Offscreen() {
+        IntPtr lv = FindDesktopListview();
+        if (lv == IntPtr.Zero) { return -1; }
+        RECT rc;
+        if (!GetClientRect(lv, out rc)) { return -1; }
+        int cw = rc.R, ch = rc.B;
+        int count = (int)SendMessage(lv, 0x1004, IntPtr.Zero, IntPtr.Zero);
+        long sp = (long)SendMessage(lv, 0x1033, IntPtr.Zero, IntPtr.Zero);
+        int cx = (int)(sp & 0xFFFF), cy = (int)((sp >> 16) & 0xFFFF);
+        if (cx <= 0 || cy <= 0) { return -1; }
+        uint pid;
+        GetWindowThreadProcessId(lv, out pid);
+        IntPtr hp = OpenProcess(0x0008 | 0x0010 | 0x0400, false, pid);
+        if (hp == IntPtr.Zero) { return -1; }
+        IntPtr pt = VirtualAllocEx(hp, IntPtr.Zero, (IntPtr)16, 0x3000, 0x04);
+        if (pt == IntPtr.Zero) { CloseHandle(hp); return -1; }
+        int off = 0;
+        byte[] raw = new byte[8];
+        for (int i = 0; i < count; i++) {
+            SendMessage(lv, 0x1010, (IntPtr)i, pt);
+            IntPtr rd;
+            ReadProcessMemory(hp, pt, raw, (IntPtr)8, out rd);
+            int x = BitConverter.ToInt32(raw, 0);
+            int y = BitConverter.ToInt32(raw, 4);
+            if (x < 0 || y < 0 || (x + cx) > cw || (y + cy) > ch) { off++; }
+        }
+        VirtualFreeEx(hp, pt, IntPtr.Zero, 0x8000);
+        CloseHandle(hp);
+        return off;
+    }
 }
 "@
 try { Add-Type -TypeDefinition $sig -ErrorAction Stop } catch { }
@@ -103,6 +202,18 @@ function Get-IconSizeReg {
 function Set-IconSizeReg([int]$size) {
     if (-not (Test-Path $bagsKey)) { New-Item -Path $bagsKey -Force | Out-Null }
     New-ItemProperty -Path $bagsKey -Name IconSize -PropertyType DWord -Value $size -Force | Out-Null
+}
+
+function Get-HideIcons {
+    $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+    $v = (Get-ItemProperty -Path $k -Name HideIcons -ErrorAction SilentlyContinue).HideIcons
+    if ($null -eq $v) { return 0 }
+    return [int]$v
+}
+function Set-HideIcons([int]$v) {
+    $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+    if (-not (Test-Path $k)) { return }
+    Set-ItemProperty -Path $k -Name HideIcons -Value $v -Type DWord -ErrorAction SilentlyContinue
 }
 
 function Get-DesktopProcess { Get-Process -Name explorer -ErrorAction SilentlyContinue }
@@ -155,14 +266,30 @@ if (-not $CheckOnly) {
     if ($Stop360) { Stop-360Desktop }
 }
 
+# A desktop helper (360 desktop assistant and friends) may also switch "show desktop
+# icons" off. Icons hidden = empty desktop, so treat it as damage and undo it.
+$hideBroken = $false
+$hideNow = Get-HideIcons
+if ((-not $CheckOnly) -and $hideNow -ne 0) {
+    Write-Log ('desktop icons were hidden (HideIcons=' + $hideNow + '), turning them back on')
+    Set-HideIcons 0
+    $hideBroken = $true
+}
+
 $needRestart = $false
 if ($icons -lt 0) { $needRestart = $true }
 if ((-not $CheckOnly) -and $cur -ne $IconSize) { $needRestart = $true }
+if ($hideBroken) { $needRestart = $true }
 
 if ($CheckOnly) {
-    Write-Log ('check: registry=' + $cur + ' desired=' + $IconSize + ' icons=' + $icons + ' restartNeeded=' + $needRestart)
+    Write-Log ('check: registry=' + $cur + ' desired=' + $IconSize + ' icons=' + $icons + ' hideIcons=' + (Get-HideIcons) + ' restartNeeded=' + $needRestart + ' offscreen=' + [DeskFix]::Offscreen())
 } elseif ($needRestart) {
     Restart-Desktop | Out-Null
+}
+
+if ((-not $CheckOnly) -and $Reflow) {
+    Write-Log ('reflow: ' + [DeskFix]::Reflow())
+    Write-Log ('reflow: offscreen now ' + [DeskFix]::Offscreen())
 }
 
 $finalSize = Get-IconSizeReg
@@ -190,6 +317,15 @@ if ((-not $CheckOnly) -and $KeepMinutes -gt 0) {
             $fixes++
             continue
         }
+        $wHide = Get-HideIcons
+        if ($wHide -ne 0) {
+            Write-Log ('watch: desktop icons were hidden (HideIcons=' + $wHide + '), turning them back on')
+            Set-HideIcons 0
+            Restart-Desktop | Out-Null
+            if ($Reflow) { Write-Log ('watch: reflow: ' + [DeskFix]::Reflow()) }
+            $fixes++
+            continue
+        }
         $wCY = Get-DesktopSpacingCY
         $reset = ($wSize -ne $IconSize)
         $shrunk = ($baseCY -gt 0 -and $wCY -gt 0 -and $wCY -lt ($baseCY - 2))
@@ -197,11 +333,20 @@ if ((-not $CheckOnly) -and $KeepMinutes -gt 0) {
             Write-Log ('watch: reset detected (registry ' + $wSize + ' wanted ' + $IconSize + ', spacingCY ' + $wCY + ' baseline ' + $baseCY + '), re-applying')
             Set-IconSizeReg $IconSize
             Restart-Desktop | Out-Null
+            if ($Reflow) { Write-Log ('watch: reflow: ' + [DeskFix]::Reflow()) }
             $baseCY = Get-DesktopSpacingCY
             $fixes++
             continue
         }
-        Write-Log ('watch: ok registry=' + $wSize + ' spacingCY=' + $wCY + ' icons=' + $wIcons)
+        $wOff = -1
+        if ($Reflow) { $wOff = [DeskFix]::Offscreen() }
+        if ($Reflow -and $wOff -gt 0) {
+            Write-Log ('watch: ' + $wOff + ' icons outside the visible desktop, reflowing')
+            Write-Log ('watch: reflow: ' + [DeskFix]::Reflow())
+            $fixes++
+            continue
+        }
+        Write-Log ('watch: ok registry=' + $wSize + ' spacingCY=' + $wCY + ' icons=' + $wIcons + ' hideIcons=0 offscreen=' + $wOff)
     }
     Write-Log ('watch: finished, corrections=' + $fixes)
 }
@@ -210,8 +355,8 @@ $finalSize = Get-IconSizeReg
 $finalIcons = Get-DesktopIconCount
 $finalCY = -1
 if ($finalIcons -ge 0) { $finalCY = Get-DesktopSpacingCY }
-$ok = ($finalSize -eq $IconSize) -and ($finalIcons -ge 0)
-Write-Log ('final: registry IconSize=' + $finalSize + '  spacingCY=' + $finalCY + '  live icons=' + $finalIcons + '  ok=' + $ok)
+$ok = ($finalSize -eq $IconSize) -and ($finalIcons -ge 0) -and ((Get-HideIcons) -eq 0)
+Write-Log ('final: registry IconSize=' + $finalSize + '  spacingCY=' + $finalCY + '  live icons=' + $finalIcons + '  hideIcons=' + (Get-HideIcons) + '  ok=' + $ok)
 Write-Log '=== desk-fix end ==='
 
 if (-not $NoPause -and -not $CheckOnly -and $env:GU_NO_PAUSE -ne '1') {

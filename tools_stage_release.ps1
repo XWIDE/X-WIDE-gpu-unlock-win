@@ -38,6 +38,14 @@ foreach ($d in $sourceDirs) {
 
 $installer = Join-Path $rel 'installer'
 $null = robocopy (Join-Path $src 'dist\share') $installer /E /NFL /NDL /NJH /NJS
+# keep ASCII-named copies in sync with the Chinese-named originals (INSTALL.bat calls install.ps1)
+$zhInstall = [string][char]0x5B89 + [char]0x88C5 + '.ps1'
+$zhUninstall = [string][char]0x5378 + [char]0x8F7D + '.ps1'
+foreach ($pair in @(@($zhInstall, 'install.ps1'), @($zhUninstall, 'uninstall.ps1'))) {
+    $from = Join-Path $installer $pair[0]
+    if (Test-Path $from) { Copy-Item $from (Join-Path $installer $pair[1]) -Force }
+    else { Write-Host ('skip missing: ' + $pair[0]) }
+}
 $scriptDir = Join-Path $installer 'scripts'
 New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
 $distScripts = @(

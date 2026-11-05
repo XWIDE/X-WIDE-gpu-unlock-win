@@ -103,9 +103,11 @@ $tasks = @(
 	},
 	@{
 		name = 'GpuUnlockDeskFix'
-		desc = '登录后恢复桌面图标大小（顺手修好桌面图标层）'
+		desc = '登录后跑一次：恢复桌面图标大小、图标层、被隐藏的图标，把跑到屏幕外的图标搬回可视区'
 		script = 'desk-fix.ps1'
-		trigger = '<LogonTrigger><Enabled>true</Enabled><UserId>' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '</UserId><Delay>PT20S</Delay></LogonTrigger>'
+		args = '-Reflow -NoPause'
+		timeLimit = 'PT5M'
+		trigger = '<LogonTrigger><Enabled>true</Enabled><UserId>' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '</UserId><Delay>PT45S</Delay></LogonTrigger>'
 		user = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 	}
 )
@@ -126,13 +128,13 @@ foreach ($t in $tasks) {
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <AllowHardTerminate>true</AllowHardTerminate>
     <StartWhenAvailable>false</StartWhenAvailable>
-    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
+    <ExecutionTimeLimit>$($(if ($t.timeLimit) { $t.timeLimit } else { 'PT5M' }))</ExecutionTimeLimit>
     <Enabled>true</Enabled>
   </Settings>
   <Actions Context="Author">
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$scriptPath"</Arguments>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$scriptPath" $($t.args)</Arguments>
     </Exec>
   </Actions>
 </Task>
@@ -167,12 +169,12 @@ Write-Host '接下来：正常关机 → 开机时自动解锁 → 进桌面就�
 Write-Host ('日志目录：' + (Join-Path $env:ProgramData 'GpuUnlock'))
 Write-Host '想撤销：跑同目录的 卸载.ps1'
 
-# 顺手把桌面图标恢复成 64px（不重启资源管理器就等下次登录由 GpuUnlockDeskFix 生效）
+# 顺手把桌面图标恢复成已保存的大小（没保存过就是 64px；不重启资源管理器就等下次登录由 GpuUnlockDeskFix 生效）
 $deskFix = Join-Path $root 'desk-fix.ps1'
 if (Test-Path $deskFix) {
 	Write-Host ''
 	Write-Host '=== 桌面图标 ==='
 	$env:GU_NO_PAUSE = '1'
-	try { & $deskFix -IconSize 64 -NoPause | ForEach-Object { Write-Host ('  ' + $_) } } catch { Write-Host ('  桌面修复跳过：' + $_.Exception.Message) }
+	try { & $deskFix -NoPause | ForEach-Object { Write-Host ('  ' + $_) } } catch { Write-Host ('  桌面修复跳过：' + $_.Exception.Message) }
 	Write-Host '  图标大小可在 GPU 解锁面板里点「图标 大 + / 图标 小 −」随时调整'
 }

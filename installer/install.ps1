@@ -103,10 +103,10 @@ $tasks = @(
 	},
 	@{
 		name = 'GpuUnlockDeskFix'
-		desc = '登录后恢复桌面图标大小（顺手修好桌面图标层，之后 30 分钟内被改回还会自己修）'
+		desc = '登录后跑一次：恢复桌面图标大小、图标层、被隐藏的图标，把跑到屏幕外的图标搬回可视区'
 		script = 'desk-fix.ps1'
-		args = '-KeepMinutes 30 -NoPause'
-		timeLimit = 'PT60M'
+		args = '-Reflow -NoPause'
+		timeLimit = 'PT5M'
 		trigger = '<LogonTrigger><Enabled>true</Enabled><UserId>' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '</UserId><Delay>PT45S</Delay></LogonTrigger>'
 		user = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 	}
